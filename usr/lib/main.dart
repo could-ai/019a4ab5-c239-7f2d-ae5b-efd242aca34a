@@ -1,3 +1,6 @@
+import 'package:flame/game.dart';
+import 'package:flame/components.dart';
+import 'package:flame/input.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -7,114 +10,141 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'BMW Open World Driving Game',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const GamePage(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
+class GamePage extends StatelessWidget {
+  const GamePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text('$_counter', style: Theme.of(context).textTheme.headlineMedium),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      body: GameWidget(game: BMWDrivingGame()),
     );
+  }
+}
+
+class BMWDrivingGame extends FlameGame with HasKeyboardHandlerComponents, HasCollisionDetection {
+  late Car playerCar;
+  late World world;
+  late CameraComponent camera;
+
+  @override
+  Future<void> onLoad() async {
+    // Load world
+    world = World();
+    add(world);
+
+    // Add player car starting with BMW M5 E39
+    playerCar = Car('BMW M5 E39');
+    world.add(playerCar);
+
+    // Set up camera to follow the car
+    camera = CameraComponent(world: world);
+    camera.follow(playerCar);
+    add(camera);
+
+    // Add basic world elements (roads, buildings, etc.)
+    _addWorldElements();
+  }
+
+  void _addWorldElements() {
+    // Add road network
+    world.add(Road(Vector2(0, 0), Vector2(1000, 0))); // Horizontal road
+    world.add(Road(Vector2(0, 0), Vector2(0, 1000))); // Vertical road
+
+    // Add some buildings or obstacles
+    world.add(Building(Vector2(200, 200)));
+    world.add(Building(Vector2(400, 400)));
+  }
+}
+
+class Car extends SpriteComponent with KeyboardHandler, HasGameRef<BMWDrivingGame> {
+  final String model;
+  Vector2 velocity = Vector2.zero();
+  double speed = 0.0;
+  double maxSpeed = 200.0;
+  double acceleration = 50.0;
+  double deceleration = 30.0;
+  double rotationSpeed = 3.0;
+
+  Car(this.model) : super(size: Vector2(32, 16));
+
+  @override
+  Future<void> onLoad() async {
+    // Load car sprite (placeholder for now)
+    sprite = await gameRef.loadSprite('car_$model.png');
+    anchor = Anchor.center;
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+
+    // Update position based on velocity
+    position += velocity * dt;
+
+    // Apply friction
+    velocity *= 0.98;
+  }
+
+  @override
+  bool onKeyEvent(RawKeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
+    // Handle keyboard input for driving
+    if (keysPressed.contains(LogicalKeyboardKey.keyW) || keysPressed.contains(LogicalKeyboardKey.arrowUp)) {
+      speed += acceleration * gameRef.dt;
+      if (speed > maxSpeed) speed = maxSpeed;
+    }
+    if (keysPressed.contains(LogicalKeyboardKey.keyS) || keysPressed.contains(LogicalKeyboardKey.arrowDown)) {
+      speed -= deceleration * gameRef.dt;
+      if (speed < -maxSpeed / 2) speed = -maxSpeed / 2;
+    }
+    if (keysPressed.contains(LogicalKeyboardKey.keyA) || keysPressed.contains(LogicalKeyboardKey.arrowLeft)) {
+      angle -= rotationSpeed * gameRef.dt;
+    }
+    if (keysPressed.contains(LogicalKeyboardKey.keyD) || keysPressed.contains(LogicalKeyboardKey.arrowRight)) {
+      angle += rotationSpeed * gameRef.dt;
+    }
+
+    // Update velocity based on angle and speed
+    velocity = Vector2(cos(angle), sin(angle)) * speed;
+
+    return true;
+  }
+}
+
+class Road extends PositionComponent {
+  final Vector2 start;
+  final Vector2 end;
+
+  Road(this.start, this.end);
+
+  @override
+  void render(Canvas canvas) {
+    final paint = Paint()..color = Colors.gray..strokeWidth = 10;
+    canvas.drawLine(Offset(start.x, start.y), Offset(end.x, end.y), paint);
+  }
+}
+
+class Building extends PositionComponent {
+  Building(Vector2 position) {
+    this.position = position;
+    size = Vector2(50, 50);
+  }
+
+  @override
+  void render(Canvas canvas) {
+    final paint = Paint()..color = Colors.brown;
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.x, size.y), paint);
   }
 }
